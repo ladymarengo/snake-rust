@@ -1,7 +1,8 @@
-use bevy::{prelude::*, core::FixedTimestep};
+use bevy::{prelude::*, core::FixedTimestep, sprite::collide_aabb::collide};
+use rand::Rng;
 
 const BLOCK_SIZE: f32 = 20.0;
-const TIMESTEP_1_PER_SECOND: f64 = 30.0 / 60.0;
+const TIMESTEP_1_PER_SECOND: f64 = 15.0 / 60.0;
 
 fn main() {
     App::new()
@@ -13,13 +14,15 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
-        .insert_resource(Eaten(false))
+        .insert_resource(Eaten(true))
         .add_startup_system(start)
+        .add_system_to_stage(CoreStage::PreUpdate, spawn_food)
         .add_system_set(
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(TIMESTEP_1_PER_SECOND))
                 .with_system(head_move.label("head"))
-                .with_system(body_move.after("head"))
+                .with_system(eat_food.after("head").label("eat"))
+                .with_system(body_move.after("eat").label("body"))             
         )
         .add_system(change_direction)
         .run();
@@ -47,6 +50,9 @@ struct Direction {
 #[derive(Default)]
 struct Eaten(bool);
 
+#[derive(Component)]
+struct Food;
+
 fn start(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
     let head = commands
@@ -72,7 +78,7 @@ fn start(mut commands: Commands) {
             ..Default::default()
         },
         sprite: Sprite {
-            color: Color::rgb(1.0, 0.5, 0.5),
+            color: Color::rgb(0.5, 0.5, 1.0),
             ..Default::default()
         },
         ..Default::default()
@@ -94,7 +100,7 @@ fn head_move(mut commands: Commands, mut query: Query<(Entity, &mut SnakeHead, &
             ..Default::default()
         },
         sprite: Sprite {
-            color: Color::rgb(1.0, 0.5, 0.5),
+            color: Color::rgb(0.5, 0.5, 1.0),
             ..Default::default()
         },
         ..Default::default()
@@ -131,5 +137,48 @@ fn change_direction(keys: Res<Input<KeyCode>>, mut query: Query<&mut Direction>)
     if keys.just_pressed(KeyCode::Down) && direction.y != 1.0 {
         direction.x = 0.0;
         direction.y = -1.0;
+    }
+}
+
+fn eat_food(mut commands: Commands, snake_query: Query<&Transform, With<SnakeHead>>, food_query: Query<(Entity, &Transform), With<Food>>, mut eaten: ResMut<Eaten>) {
+    let snake = snake_query.single();
+    if !food_query.is_empty() {
+        let (food_entity, food) = food_query.single();
+        if snake.translation.distance(food.translation) < 1.0 {
+            println!("eat");
+            commands.entity(food_entity).despawn();
+            eaten.0 = true;
+        }
+    } else {
+        println!("no food");
+    }
+}
+
+fn spawn_food(mut commands: Commands, query: Query<&Transform>, mut eaten: ResMut<Eaten>) {
+    if eaten.0 {
+        eaten.0 = false;
+        loop {
+            let mut rng = ::rand::thread_rng();
+            let food_translation = Vec3::new(BLOCK_SIZE * rng.gen_range(-9..9) as f32, BLOCK_SIZE * rng.gen_range(-9..9) as f32, 0.0);
+            println!("{:?}", food_translation);
+            let food = commands
+            .spawn_bundle(SpriteBundle {
+                transform: Transform {
+                    translation: food_translation,
+                    scale: Vec3::new(BLOCK_SIZE, BLOCK_SIZE, 0.0),
+                    ..Default::default()
+                },
+                sprite: Sprite {
+                    color: Color::rgb(0.5, 1.0, 0.5),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }).insert(Food).id();
+
+            if !query.iter().any(|e| e.translation.distance(food_translation) < 1.0) {
+                break;
+            }
+            commands.entity(food).despawn();
+        }
     }
 }
