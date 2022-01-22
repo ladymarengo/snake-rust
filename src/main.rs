@@ -1,10 +1,14 @@
 use bevy::{prelude::*, core::FixedTimestep, sprite::collide_aabb::collide};
-use rand::Rng;
+use bevy_kira_audio::{AudioPlugin, AudioSource, Audio};
+use rand::{Rng, prelude::SliceRandom};
 
 const BLOCK_SIZE: f32 = 20.0;
 const TIMESTEP_1_PER_SECOND: f64 = 15.0 / 60.0;
 
+struct LoadedSounds(Vec<Handle<AudioSource>>);
+
 fn main() {
+    
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.9, 0.9, 0.9)))
         .insert_resource(WindowDescriptor {
@@ -14,6 +18,11 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
+
+        .insert_resource(LoadedSounds(vec![]))
+        .add_plugin(AudioPlugin)
+        .add_startup_system(load_sounds)
+
         .insert_resource(Eaten(true))
         .add_startup_system(start)
         .add_system_to_stage(CoreStage::PreUpdate, spawn_food)
@@ -89,6 +98,14 @@ fn start(mut commands: Commands) {
     commands.entity(body).insert(SnakeBody {next: head});
 }
 
+fn load_sounds(mut sounds: ResMut<LoadedSounds>, asset_server: Res<AssetServer>) {
+    
+    let loaded_sounds = (1..=4).map(|i|{
+        asset_server.load(&format!("nom{i}.ogg"))
+    });
+    sounds.0.extend(loaded_sounds);
+}
+
 fn head_move(mut commands: Commands, mut query: Query<(Entity, &mut SnakeHead, &Direction, &mut Transform)>, mut query_body: Query<&mut SnakeBody>) {
     let (head_entity, mut head, direction, mut transform) = query.single_mut();
     let head_translation = &mut transform.translation;
@@ -140,12 +157,21 @@ fn change_direction(keys: Res<Input<KeyCode>>, mut query: Query<&mut Direction>)
     }
 }
 
-fn eat_food(mut commands: Commands, snake_query: Query<&Transform, With<SnakeHead>>, food_query: Query<(Entity, &Transform), With<Food>>, mut eaten: ResMut<Eaten>) {
+fn eat_food(
+    mut commands: Commands,
+    snake_query: Query<&Transform, With<SnakeHead>>,
+    food_query: Query<(Entity, &Transform), With<Food>>,
+    mut eaten: ResMut<Eaten>,
+    audio: Res<Audio>,
+    sounds: Res<LoadedSounds>
+) {
     let snake = snake_query.single();
     if !food_query.is_empty() {
         let (food_entity, food) = food_query.single();
         if snake.translation.distance(food.translation) < 1.0 {
-            println!("eat");
+            audio.play(
+                sounds.0.choose(&mut rand::thread_rng()).unwrap().clone()
+            );
             commands.entity(food_entity).despawn();
             eaten.0 = true;
         }
