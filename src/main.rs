@@ -17,9 +17,11 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
+        // Sounds
         .insert_resource(LoadedSounds(vec![]))
         .add_plugin(AudioPlugin)
         .add_startup_system(load_sounds)
+        // Logic
         .insert_resource(Eaten(true))
         .add_startup_system(start)
         .add_system_to_stage(CoreStage::PreUpdate, spawn_food)
