@@ -1,6 +1,6 @@
-use bevy::{prelude::*, core::FixedTimestep, sprite::collide_aabb::collide};
-use bevy_kira_audio::{AudioPlugin, AudioSource, Audio};
-use rand::{Rng, prelude::SliceRandom};
+use bevy::{core::FixedTimestep, prelude::*, sprite::collide_aabb::collide};
+use bevy_kira_audio::{Audio, AudioPlugin, AudioSource};
+use rand::{prelude::SliceRandom, Rng};
 
 const BLOCK_SIZE: f32 = 20.0;
 const TIMESTEP_1_PER_SECOND: f64 = 15.0 / 60.0;
@@ -8,7 +8,6 @@ const TIMESTEP_1_PER_SECOND: f64 = 15.0 / 60.0;
 struct LoadedSounds(Vec<Handle<AudioSource>>);
 
 fn main() {
-    
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.9, 0.9, 0.9)))
         .insert_resource(WindowDescriptor {
@@ -18,11 +17,9 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
-
         .insert_resource(LoadedSounds(vec![]))
         .add_plugin(AudioPlugin)
         .add_startup_system(load_sounds)
-
         .insert_resource(Eaten(true))
         .add_startup_system(start)
         .add_system_to_stage(CoreStage::PreUpdate, spawn_food)
@@ -31,7 +28,7 @@ fn main() {
                 .with_run_criteria(FixedTimestep::step(TIMESTEP_1_PER_SECOND))
                 .with_system(head_move.label("head"))
                 .with_system(eat_food.after("head").label("eat"))
-                .with_system(body_move.after("eat").label("body"))             
+                .with_system(body_move.after("eat").label("body")),
         )
         .add_system(change_direction)
         .run();
@@ -76,60 +73,70 @@ fn start(mut commands: Commands) {
                 ..Default::default()
             },
             ..Default::default()
-        }).insert(Direction{x: 1.0, y: 0.0})
+        })
+        .insert(Direction { x: 1.0, y: 0.0 })
         .id();
 
     let body = commands
-    .spawn_bundle(SpriteBundle {
-        transform: Transform {
-            translation: Vec3::new(0.0 - BLOCK_SIZE, 0.0, 0.0),
-            scale: Vec3::new(BLOCK_SIZE, BLOCK_SIZE, 0.0),
+        .spawn_bundle(SpriteBundle {
+            transform: Transform {
+                translation: Vec3::new(0.0 - BLOCK_SIZE, 0.0, 0.0),
+                scale: Vec3::new(BLOCK_SIZE, BLOCK_SIZE, 0.0),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                color: Color::rgb(0.5, 0.5, 1.0),
+                ..Default::default()
+            },
             ..Default::default()
-        },
-        sprite: Sprite {
-            color: Color::rgb(0.5, 0.5, 1.0),
-            ..Default::default()
-        },
-        ..Default::default()
-    })
-        .insert(Last).id();
+        })
+        .insert(Last)
+        .id();
 
-    commands.entity(head).insert(SnakeHead {previous: body});
-    commands.entity(body).insert(SnakeBody {next: head});
+    commands.entity(head).insert(SnakeHead { previous: body });
+    commands.entity(body).insert(SnakeBody { next: head });
 }
 
 fn load_sounds(mut sounds: ResMut<LoadedSounds>, asset_server: Res<AssetServer>) {
-    
-    let loaded_sounds = (1..=4).map(|i|{
-        asset_server.load(&format!("nom{i}.ogg"))
-    });
+    let loaded_sounds = (1..=4).map(|i| asset_server.load(&format!("nom{i}.ogg")));
     sounds.0.extend(loaded_sounds);
 }
 
-fn head_move(mut commands: Commands, mut query: Query<(Entity, &mut SnakeHead, &Direction, &mut Transform)>, mut query_body: Query<&mut SnakeBody>) {
+fn head_move(
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut SnakeHead, &Direction, &mut Transform)>,
+    mut query_body: Query<&mut SnakeBody>,
+) {
     let (head_entity, mut head, direction, mut transform) = query.single_mut();
     let head_translation = &mut transform.translation;
     let new_body = commands
-    .spawn_bundle(SpriteBundle {
-        transform: Transform {
-            translation: Vec3::new(head_translation.x, head_translation.y, 0.0),
-            scale: Vec3::new(BLOCK_SIZE, BLOCK_SIZE, 0.0),
+        .spawn_bundle(SpriteBundle {
+            transform: Transform {
+                translation: Vec3::new(head_translation.x, head_translation.y, 0.0),
+                scale: Vec3::new(BLOCK_SIZE, BLOCK_SIZE, 0.0),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                color: Color::rgb(0.5, 0.5, 1.0),
+                ..Default::default()
+            },
             ..Default::default()
-        },
-        sprite: Sprite {
-            color: Color::rgb(0.5, 0.5, 1.0),
-            ..Default::default()
-        },
-        ..Default::default()
-    }).id();
-    commands.entity(new_body).insert(SnakeBody {next: head_entity});
+        })
+        .id();
+    commands
+        .entity(new_body)
+        .insert(SnakeBody { next: head_entity });
     query_body.get_mut(head.previous).unwrap().next = new_body;
     head.previous = new_body;
     head_translation.x += BLOCK_SIZE * direction.x;
     head_translation.y += BLOCK_SIZE * direction.y;
 }
 
-fn body_move(mut commands: Commands, mut query: Query<(Entity, &SnakeBody), With<Last>>, eaten: Res<Eaten>) {
+fn body_move(
+    mut commands: Commands,
+    mut query: Query<(Entity, &SnakeBody), With<Last>>,
+    eaten: Res<Eaten>,
+) {
     if !eaten.0 {
         let (last_entity, last_body) = query.single_mut();
         commands.entity(last_body.next).insert(Last);
@@ -163,15 +170,13 @@ fn eat_food(
     food_query: Query<(Entity, &Transform), With<Food>>,
     mut eaten: ResMut<Eaten>,
     audio: Res<Audio>,
-    sounds: Res<LoadedSounds>
+    sounds: Res<LoadedSounds>,
 ) {
     let snake = snake_query.single();
     if !food_query.is_empty() {
         let (food_entity, food) = food_query.single();
         if snake.translation.distance(food.translation) < 1.0 {
-            audio.play(
-                sounds.0.choose(&mut rand::thread_rng()).unwrap().clone()
-            );
+            audio.play(sounds.0.choose(&mut rand::thread_rng()).unwrap().clone());
             commands.entity(food_entity).despawn();
             eaten.0 = true;
         }
@@ -185,23 +190,32 @@ fn spawn_food(mut commands: Commands, query: Query<&Transform>, mut eaten: ResMu
         eaten.0 = false;
         loop {
             let mut rng = ::rand::thread_rng();
-            let food_translation = Vec3::new(BLOCK_SIZE * rng.gen_range(-9..9) as f32, BLOCK_SIZE * rng.gen_range(-9..9) as f32, 0.0);
+            let food_translation = Vec3::new(
+                BLOCK_SIZE * rng.gen_range(-9..9) as f32,
+                BLOCK_SIZE * rng.gen_range(-9..9) as f32,
+                0.0,
+            );
             println!("{:?}", food_translation);
             let food = commands
-            .spawn_bundle(SpriteBundle {
-                transform: Transform {
-                    translation: food_translation,
-                    scale: Vec3::new(BLOCK_SIZE, BLOCK_SIZE, 0.0),
+                .spawn_bundle(SpriteBundle {
+                    transform: Transform {
+                        translation: food_translation,
+                        scale: Vec3::new(BLOCK_SIZE, BLOCK_SIZE, 0.0),
+                        ..Default::default()
+                    },
+                    sprite: Sprite {
+                        color: Color::rgb(0.5, 1.0, 0.5),
+                        ..Default::default()
+                    },
                     ..Default::default()
-                },
-                sprite: Sprite {
-                    color: Color::rgb(0.5, 1.0, 0.5),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }).insert(Food).id();
+                })
+                .insert(Food)
+                .id();
 
-            if !query.iter().any(|e| e.translation.distance(food_translation) < 1.0) {
+            if !query
+                .iter()
+                .any(|e| e.translation.distance(food_translation) < 1.0)
+            {
                 break;
             }
             commands.entity(food).despawn();
