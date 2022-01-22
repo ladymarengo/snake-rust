@@ -1,7 +1,7 @@
 use bevy::{prelude::*, core::FixedTimestep};
 
 const BLOCK_SIZE: f32 = 20.0;
-const TIMESTEP_1_PER_SECOND: f64 = 60.0 / 60.0;
+const TIMESTEP_1_PER_SECOND: f64 = 30.0 / 60.0;
 
 fn main() {
     App::new()
@@ -13,12 +13,15 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
+        .insert_resource(Eaten(false))
         .add_startup_system(start)
         .add_system_set(
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(TIMESTEP_1_PER_SECOND))
-                .with_system(head_move)
+                .with_system(head_move.label("head"))
+                .with_system(body_move.after("head"))
         )
+        .add_system(change_direction)
         .run();
 }
 
@@ -35,6 +38,15 @@ struct SnakeBody {
 #[derive(Component)]
 struct Last;
 
+#[derive(Component)]
+struct Direction {
+    x: f32,
+    y: f32,
+}
+
+#[derive(Default)]
+struct Eaten(bool);
+
 fn start(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
     let head = commands
@@ -49,7 +61,8 @@ fn start(mut commands: Commands) {
                 ..Default::default()
             },
             ..Default::default()
-        }).id();
+        }).insert(Direction{x: 1.0, y: 0.0})
+        .id();
 
     let body = commands
     .spawn_bundle(SpriteBundle {
@@ -70,8 +83,8 @@ fn start(mut commands: Commands) {
     commands.entity(body).insert(SnakeBody {next: head});
 }
 
-fn head_move(mut commands: Commands, mut query: Query<(Entity, &mut SnakeHead, &mut Transform)>, mut query_body: Query<&mut SnakeBody>) {
-    let (head_entity, mut head, mut transform) = query.single_mut();
+fn head_move(mut commands: Commands, mut query: Query<(Entity, &mut SnakeHead, &Direction, &mut Transform)>, mut query_body: Query<&mut SnakeBody>) {
+    let (head_entity, mut head, direction, mut transform) = query.single_mut();
     let head_translation = &mut transform.translation;
     let new_body = commands
     .spawn_bundle(SpriteBundle {
@@ -89,5 +102,34 @@ fn head_move(mut commands: Commands, mut query: Query<(Entity, &mut SnakeHead, &
     commands.entity(new_body).insert(SnakeBody {next: head_entity});
     query_body.get_mut(head.previous).unwrap().next = new_body;
     head.previous = new_body;
-    head_translation.x += BLOCK_SIZE;
+    head_translation.x += BLOCK_SIZE * direction.x;
+    head_translation.y += BLOCK_SIZE * direction.y;
+}
+
+fn body_move(mut commands: Commands, mut query: Query<(Entity, &SnakeBody), With<Last>>, eaten: Res<Eaten>) {
+    if !eaten.0 {
+        let (last_entity, last_body) = query.single_mut();
+        commands.entity(last_body.next).insert(Last);
+        commands.entity(last_entity).despawn();
+    }
+}
+
+fn change_direction(keys: Res<Input<KeyCode>>, mut query: Query<&mut Direction>) {
+    let mut direction = query.single_mut();
+    if keys.just_pressed(KeyCode::Left) && direction.x != 1.0 {
+        direction.x = -1.0;
+        direction.y = 0.0;
+    }
+    if keys.just_pressed(KeyCode::Right) && direction.x != -1.0 {
+        direction.x = 1.0;
+        direction.y = 0.0;
+    }
+    if keys.just_pressed(KeyCode::Up) && direction.y != -1.0 {
+        direction.x = 0.0;
+        direction.y = 1.0;
+    }
+    if keys.just_pressed(KeyCode::Down) && direction.y != 1.0 {
+        direction.x = 0.0;
+        direction.y = -1.0;
+    }
 }
