@@ -1,8 +1,8 @@
-use bevy::{core::FixedTimestep, prelude::*, sprite::collide_aabb::collide};
+use bevy::{core::FixedTimestep, prelude::*};
 use bevy_kira_audio::{Audio, AudioPlugin, AudioSource};
 use rand::{prelude::SliceRandom, Rng};
 
-const BLOCK_SIZE: f32 = 20.0;
+const BLOCK_SIZE: f32 = 30.0;
 const TIMESTEP_1_PER_SECOND: f64 = 15.0 / 60.0;
 
 struct LoadedSounds(Vec<Handle<AudioSource>>);
@@ -13,6 +13,7 @@ fn main() {
         .insert_resource(WindowDescriptor {
             width: BLOCK_SIZE * 20.0,
             height: BLOCK_SIZE * 20.0,
+            title: "Snake".to_string(),
             resizable: false,
             ..Default::default()
         })
@@ -71,7 +72,7 @@ fn start(mut commands: Commands) {
                 ..Default::default()
             },
             sprite: Sprite {
-                color: Color::rgb(0.5, 0.5, 1.0),
+                color: Color::rgb(0.25, 0.25, 0.65),
                 ..Default::default()
             },
             ..Default::default()
@@ -87,7 +88,7 @@ fn start(mut commands: Commands) {
                 ..Default::default()
             },
             sprite: Sprite {
-                color: Color::rgb(0.5, 0.5, 1.0),
+                color: Color::rgb(0.25, 0.25, 0.65),
                 ..Default::default()
             },
             ..Default::default()
@@ -119,7 +120,7 @@ fn head_move(
                 ..Default::default()
             },
             sprite: Sprite {
-                color: Color::rgb(0.5, 0.5, 1.0),
+                color: Color::rgb(0.25, 0.25, 0.65),
                 ..Default::default()
             },
             ..Default::default()
@@ -182,8 +183,6 @@ fn eat_food(
             commands.entity(food_entity).despawn();
             eaten.0 = true;
         }
-    } else {
-        println!("no food");
     }
 }
 
@@ -197,7 +196,6 @@ fn spawn_food(mut commands: Commands, query: Query<&Transform>, mut eaten: ResMu
                 BLOCK_SIZE * rng.gen_range(-9..9) as f32,
                 0.0,
             );
-            println!("{:?}", food_translation);
             let food = commands
                 .spawn_bundle(SpriteBundle {
                     transform: Transform {
@@ -206,7 +204,7 @@ fn spawn_food(mut commands: Commands, query: Query<&Transform>, mut eaten: ResMu
                         ..Default::default()
                     },
                     sprite: Sprite {
-                        color: Color::rgb(0.5, 1.0, 0.5),
+                        color: Color::rgb(0.7, 0.5, 0.3),
                         ..Default::default()
                     },
                     ..Default::default()
