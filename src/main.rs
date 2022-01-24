@@ -1,3 +1,4 @@
+use std::process::exit;
 use bevy::{core::FixedTimestep, prelude::*};
 use bevy_kira_audio::{Audio, AudioPlugin, AudioSource};
 use rand::{prelude::SliceRandom, Rng};
@@ -34,6 +35,7 @@ fn main() {
                 .with_system(body_move.after("eat").label("body")),
         )
         .add_system(change_direction)
+        .add_system(check_wall)
         .run();
 }
 
@@ -67,7 +69,7 @@ fn start(mut commands: Commands) {
     let head = commands
         .spawn_bundle(SpriteBundle {
             transform: Transform {
-                translation: Vec3::new(0.0, 0.0, 0.0),
+                translation: Vec3::new(BLOCK_SIZE / 2.0, BLOCK_SIZE / 2.0, 0.0),
                 scale: Vec3::new(BLOCK_SIZE, BLOCK_SIZE, 0.0),
                 ..Default::default()
             },
@@ -83,7 +85,7 @@ fn start(mut commands: Commands) {
     let body = commands
         .spawn_bundle(SpriteBundle {
             transform: Transform {
-                translation: Vec3::new(0.0 - BLOCK_SIZE, 0.0, 0.0),
+                translation: Vec3::new(0.0 - BLOCK_SIZE / 2.0, BLOCK_SIZE / 2.0, 0.0),
                 scale: Vec3::new(BLOCK_SIZE, BLOCK_SIZE, 0.0),
                 ..Default::default()
             },
@@ -133,6 +135,23 @@ fn head_move(
     head.previous = new_body;
     head_translation.x += BLOCK_SIZE * direction.x;
     head_translation.y += BLOCK_SIZE * direction.y;
+}
+
+fn check_wall(
+    head: Query<&Transform, With<SnakeHead>>,
+    query: Query<&Transform, (Without<Food>, Without<SnakeHead>)>,
+) {
+    let head_translation = head.single().translation;
+    if query
+        .iter()
+        .any(|e| e.translation.distance(head_translation) < 1.0)
+        || head_translation.x > BLOCK_SIZE * 10.0
+        || head_translation.x <= BLOCK_SIZE * -10.0
+        || head_translation.y > BLOCK_SIZE * 10.0
+        || head_translation.y <= BLOCK_SIZE * -10.0
+    {
+        exit(0);
+    }
 }
 
 fn body_move(
@@ -192,8 +211,8 @@ fn spawn_food(mut commands: Commands, query: Query<&Transform>, mut eaten: ResMu
         loop {
             let mut rng = ::rand::thread_rng();
             let food_translation = Vec3::new(
-                BLOCK_SIZE * rng.gen_range(-9..9) as f32,
-                BLOCK_SIZE * rng.gen_range(-9..9) as f32,
+                BLOCK_SIZE * rng.gen_range(-9..9) as f32 - BLOCK_SIZE / 2.0,
+                BLOCK_SIZE * rng.gen_range(-9..9) as f32 - BLOCK_SIZE / 2.0,
                 0.0,
             );
             let food = commands
