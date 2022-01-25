@@ -6,7 +6,7 @@ use rand::{prelude::SliceRandom, Rng};
 const BLOCK_SIZE: f32 = 30.0;
 const TIMESTEP: f64 = 15.0 / 60.0;
 
-struct LoadedSounds(Vec<Handle<AudioSource>>);
+// Bevy is a simple data-driven game engine built in Rust. It is free and open-source.
 
 /* "App" is a Bevy program. It will put all your game logic together.
 
@@ -24,6 +24,13 @@ Systems are logic that runs on a specific set of component types.
 You might have a movement system that runs on all entities with a
 Position and Velocity component.*/
 
+// Resources:
+struct LoadedSounds(Vec<Handle<AudioSource>>);
+
+#[derive(Default)]
+struct Eaten(bool);
+
+// Main App:
 fn main() {
     App::new()
         // Background color
@@ -37,11 +44,7 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
-        // Sounds
-        .insert_resource(LoadedSounds(vec![]))
-        .add_plugin(AudioPlugin)
-        .add_startup_system(load_sounds)
-        // Logic
+        // Add resource
         .insert_resource(Eaten(true))
         // This function will be called only once in the beginning
         // and will create a starting position.
@@ -59,10 +62,14 @@ fn main() {
         // These two functions will also be called every frame.
         .add_system(change_direction)
         .add_system(check_wall)
+        // Sounds
+        .insert_resource(LoadedSounds(vec![]))
+        .add_plugin(AudioPlugin)
+        .add_startup_system(load_sounds)
         .run();
 }
 
-// Components and Resources
+// Components
 #[derive(Component)]
 struct SnakeHead {
     previous: Entity,
@@ -81,9 +88,6 @@ struct Direction {
     x: f32,
     y: f32,
 }
-
-#[derive(Default)]
-struct Eaten(bool);
 
 #[derive(Component)]
 struct Food;
